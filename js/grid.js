@@ -73,7 +73,7 @@ Grid.prototype.cellAvailable = function (cell) {
   return !this.cellOccupied(cell);
 };
 
-Grid.prototype.cellOccupied = function (cell) {
+Grid.prototype.cellOccupied = function cel(cell) {
   return !!this.cellContent(cell);
 };
 
@@ -106,6 +106,7 @@ Grid.prototype.serialize = function () {
     var row = cellState[x] = [];
 
     for (var y = 0; y < this.size; y++) {
+		//console.log(this.cells[x][y]);
       row.push(this.cells[x][y] ? this.cells[x][y].serialize() : null);
     }
   }

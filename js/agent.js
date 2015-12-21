@@ -1,133 +1,12 @@
-// helper functions
-function swap(lst, a, b) {
-    var temp = lst[a];
-    lst[a] = lst[b];
-    lst[b] = temp;
-};
+// Constants
+var PLY = 2
+var INITIAL_DEPTH = 2 * PLY + 1; //Should be odd.
+var NUMBER_OF_CHANCE_SQUARES = 5;
+var PRAISE_MAX_CORNER = 99999;
 
+// helper functions
 function randomInt(n) {
     return Math.floor(Math.random() * n);
-};
-
-function mutationRate(rate) {
-    return Math.random() < rate;
-};
-
-// Permutation doubles as a strategy and a node in a trie
-function Permutation(perm) {
-    this.children = [null, null, null, null];
-
-    if (perm) {
-        this.perm = perm;
-    } else {
-        var lst = [0, 1, 2, 3];
-        this.perm = [];
-        while (lst.length > 0) {
-            var index = randomInt(lst.length);
-            this.perm.push(lst[index]);
-            lst.splice(index, 1);
-        }
-    }
-};
-
-Permutation.prototype.clone = function () {
-    var perm = [];
-    for (var i = 0; i < this.perm.length; i++) {
-        perm.push(this.perm[i]);
-    }
-    return new Permutation(perm);
-};
-
-Permutation.prototype.mutate = function () {
-    var a = randomInt(this.perm.length);
-    var b = randomInt(this.perm.length);
-    swap(this.perm, a, b);
-};
-
-// Trie stores differnt strategies based on last sequence of moves
-function Trie() {
-    this.root = new Permutation();
-};
-
-Trie.prototype.evalRecurse = function (prefix, perm) {
-    //console.log("Recurse");
-    //console.log(prefix);
-    //console.log(perm.perm);
-    //console.log(perm.children[0]);
-
-    if (prefix.length > 0 && perm.children[prefix[0]] !== null) {
-        var index = prefix[0];
-        return this.evalRecurse(prefix.splice(0, 1), perm.children[index]);
-    }
-    else
-        return perm;
-};
-
-Trie.prototype.evaluate = function (prefix) {
-    return this.evalRecurse(prefix, this.root);
-};
-
-Trie.prototype.mutateRecurse = function (rate, perm, grow) {
-    if (mutationRate(rate)) perm.mutate();
-    var growChild = randomInt(perm.children.length);
-    for (var i = 0; i < perm.children.length; i++) {
-        if (perm.children[i] !== null) {
-            var g = i === growChild && grow;
-            this.mutateRecurse(rate, perm.children[i], g);
-        } else {
-            if (i === growChild) perm.children[i] = new Permutation();
-        }
-    }
-};
-
-Trie.prototype.mutate = function (rate) {
-    var growTrie = mutationRate(rate);
-    this.mutateRecurse(rate, this.root, growTrie);
-};
-
-Trie.prototype.cloneRecurse = function (perm) {
-    var newPerm = perm.clone();
-    for (var i = 0; i < perm.children.length; i++) {
-        if (perm.children[i] !== null) {
-            newPerm.children[i] = this.cloneRecurse(perm.children[i]);
-        } else {
-            newPerm.children[i] = null;
-        }
-    }
-    return newPerm;
-};
-
-Trie.prototype.clone = function () {
-    return new Trie(this.cloneRecurse(this.root));
-};
-
-function BlindAgent(trie) {
-    this.actions = [];
-    this.mutationRate = 0.10;
-
-    this.score = 0;
-
-    if (trie) {
-        this.trie = trie;
-    } else {
-        this.trie = new Trie();
-        this.trie.mutate(this.mutationRate);
-    }
-};
-
-BlindAgent.prototype.selectMove = function () {
-    if (this.actions.length > 200) this.actions.splice(100, 100);
-
-    var action = this.trie.evaluate(this.actions);
-
-    return action;
-};
-
-BlindAgent.prototype.cloneAndMutate = function () {
-    var newTrie = this.trie.clone();
-    newTrie.mutate(this.mutationRate);
-
-    return new BlindAgent(newTrie);
 };
 
 function AgentBrain(gameEngine) {
@@ -152,6 +31,54 @@ AgentBrain.prototype.addRandomTile = function () {
     }
 };
 
+AgentBrain.prototype.chooseExpectedTiles = function ()
+{
+	returnTiles = []
+	if (this.grid.cellsAvailable())
+	{
+		twoCells = this.grid.availableCells();
+		fourCells = this.grid.availableCells();
+		numOfChoices = NUMBER_OF_CHANCE_SQUARES 
+						>= twoCells.length ? 
+							NUMBER_OF_CHANCE_SQUARES : twoCells.length;
+		for (var i = 0; i < numOfChoices; i++)
+		{
+			var value = Math.random() < 0.9 ? 2 : 4;
+			var cell = ""
+			
+			if (value == 2 && twoCells.length > 0)
+			{
+				//get random cell
+				cell = twoCells[Math.floor(Math.random(twoCells.length))];
+				//remove cell from the available cells
+				twoCells.splice(twoCells.indexOf(cell), 1);
+			}
+			else if (fourCells.length > 0) //4
+			{
+				//get random cell
+				cell = fourCells[Math.floor(Math.random(fourCells.length))];
+				//remove cell from the available cells
+				fourCells.splice(fourCells.indexOf(cell), 1);
+			}
+			else //All possible options have been checked.
+			{
+				break;
+			}
+			try
+			{	
+				returnTiles.push(new Tile(cell, value));
+			}
+			catch(e)
+			{
+				console.log("BOTH", cell);
+				console.log(twoCells);
+				console.log(fourCells);
+			}
+		}
+	}
+	return returnTiles;
+}
+
 AgentBrain.prototype.moveTile = function (tile, cell) {
     this.grid.cells[tile.x][tile.y] = null;
     this.grid.cells[cell.x][cell.y] = tile;
@@ -170,7 +97,7 @@ AgentBrain.prototype.move = function (direction) {
     var moved = false;
 
     //console.log(vector);
-
+	
     //console.log(traversals);
 
     // Traverse the grid in the right direction and move tiles
@@ -208,9 +135,9 @@ AgentBrain.prototype.move = function (direction) {
         });
     });
     //console.log(moved);
-    if (moved) {
-        this.addRandomTile();
-    }
+    //if (moved) {
+    //    this.addRandomTile();
+    //}
     return moved;
 };
 
@@ -263,281 +190,177 @@ AgentBrain.prototype.positionsEqual = function (first, second) {
     return first.x === second.x && first.y === second.y;
 };
 
-function LookAheadAgent() {
-    this.mutationRate = 0.10;
-
-    this.functionList = [];
-    this.genes = [];
-
-    this.loadFunctions();
-
-    for (var i = 0; i < this.functionList.length; i++) {
-        this.genes.push(0);
-    }
-
-    this.score = 0;
+function Agent() {
 };
 
-LookAheadAgent.prototype.loadFunctions = function() {
-    function emptyCells(gameManager) {
-        var count = 0;
-        function isEmpty(x, y, cell) {
-            if (cell === null) count++;
-        };
+var getLargest = function (grid)
+{
+	var largestSquare = Number.MIN_VALUE+1;
+	var secondLargest = Number.MIN_VALUE
+	cells = grid.serialize()["cells"];
+	for (var row = 0; row < cells.length; row++)
+	{
+		////console.log("ROW", cells[row]);
+		for (var col = 0; col < cells[row].length; col++)
+		{
+			if (cells[row][col] !== null)
+			{
+				////console.log("col", cells[row][col].value);
+				if (cells[row][col].value > largestSquare)
+				{
+					secondLargest = largestSquare;
+					largestSquare = cells[row][col].value;
+				}
+				else if (cells[row][col].value > secondLargest)
+				{
+					secondLargest = cells[row][col].value;
+				}
+			}
+		}
+	}
+	//console.log("LARGEST", largestSquare);
+	//console.log("EXAMPLES", largestSquare, secondLargest);
+	//console.log({first: largestSquare, second: secondLargest});
+	return {first: largestSquare, second: secondLargest};
+}
 
-        gameManager.grid.eachCell(isEmpty);
-        return count;
-    };
-    this.functionList.push(emptyCells);
+var isLargestInCorner = function (firstLargest, secondLargest, grid)
+{
+	var cells = grid.serialize()["cells"];
+	//console.log(largestSquare, cells[0][0]);
+	var util = 0
+	if (cells[3][0] && cells[3][0].value == firstLargest)
+		//|| (cells[0][3] && cells[0][3].value == largestSquare)
+		//|| (cells[3][0] && cells[3][0].value == largestSquare)
+		//|| (cells[3][3] && cells[3][3].value == largestSquare))
+		util += PRAISE_MAX_CORNER;
+		if ((cells[2][0] && (cells[2][0].value == secondLargest
+							|| cells[2][0].value == firstLargest))
+				|| (cells[3][1] && (cells[3][1].value == secondLargest
+							|| cells[3][1].value == firstLargest)))
+			util += PRAISE_MAX_CORNER;
+	return util;
+}
 
-    function score(gameManager) {
-        var count = gameManager.score;
-
-        return count;
-    };
-    this.functionList.push(score);
-
-    var emptyCount = 0;
-    function empty(gameManager) {
-        var x = Math.floor(emptyCount / 4);
-        var y = emptyCount % 4;
-        emptyCount = (emptyCount + 1) % 16;
-        if (gameManager.grid.cells[x][y] === null) return 0;
-        else return 1;
-    };
-
-    for (var i = 0; i < 16; i++) {
-        this.functionList.push(empty);
-    }
-
-    var tileCount = 0;
-    function tile(gameManager) {
-        var x = Math.floor(tileCount / 4);
-        var y = tileCount % 4;
-        tileCount = (tileCount + 1) % 16;
-        var cell = gameManager.grid.cells[x][y];
-        if (cell !== null) return Math.log(cell.value)/Math.LN2;
-        else return 0;
-    };
-
-    for (var i = 0; i < 16; i++) {
-        this.functionList.push(tile);
-    }
-
-    var upCount = 0;
-    function up(gameManager) {
-        var x = Math.floor(upCount / 4) + 1;
-        var y = upCount % 4;
-        upCount = (upCount + 1) % 12;
-        var cell = gameManager.grid.cells[x][y];
-        var cell2 = gameManager.grid.cells[x-1][y];
-        if (cell && cell2 && cell.value === cell2.value) return 1;
-        else return 0;
-    };
-
-    for (var i = 0; i < 12; i++) {
-        this.functionList.push(up);
-    }
-
-    var leftCount = 0;
-    function left(gameManager) {
-        var x = Math.floor(leftCount / 3);
-        var y = leftCount % 3 + 1;
-        leftCount = (leftCount + 1) % 12;
-        var cell = gameManager.grid.cells[x][y];
-        var cell2 = gameManager.grid.cells[x][y-1];
-        if (cell && cell2 && cell.value === cell2.value) return 1;
-        else return 0;
-    };
-
-    for (var i = 0; i < 12; i++) {
-        this.functionList.push(left);
-    }
-
-    var upCount2 = 0;
-    function up2(gameManager) {
-        var x = Math.floor(upCount2 / 4) + 1;
-        var y = upCount2 % 4;
-        upCount2 = (upCount2 + 1) % 12;
-        var cell = gameManager.grid.cells[x][y];
-        var cell2 = gameManager.grid.cells[x - 1][y];
-        if (cell && cell2 && (cell.value * 2 === cell2.value || cell.value === cell2.value * 2)) return 1;
-        else return 0;
-    };
-
-    for (var i = 0; i < 12; i++) {
-        this.functionList.push(up2);
-    }
-
-    var leftCount2 = 0;
-    function left2(gameManager) {
-        var x = Math.floor(leftCount2 / 3);
-        var y = leftCount2 % 3 + 1;
-        leftCount2 = (leftCount2 + 1) % 12;
-        var cell = gameManager.grid.cells[x][y];
-        var cell2 = gameManager.grid.cells[x][y - 1];
-        if (cell && cell2 && (cell.value * 2 === cell2.value || cell.value === cell2.value * 2)) return 1;
-        else return 0;
-    };
-
-    for (var i = 0; i < 12; i++) {
-        this.functionList.push(left2);
-    }
-
-    var maxCount = 0;
-    function maxCell(gameManager) {
-        var cellX = Math.floor(maxCount / 4);
-        var cellY = maxCount % 4;
-
-        var max = gameManager.grid.cells[0][0];
-        var xMax = 0;
-        var yMax = 0;
-
-        function findMax(x, y, cell) {
-            if (cell && cell.value > max) {
-                max = cell.value;
-                xMax = x;
-                yMax = y;
-            }
-        };
-
-        gameManager.grid.eachCell(findMax);
-
-        return (cellX === xMax) && (cellY === yMax);
-    };
-
-    for (var i = 0; i < 16; i++) {
-        this.functionList.push(maxCell);
-    }
-
+var heuristic = function (brain)
+{
+	//console.log("HEURISTIC",brain.score, Math.log(brain.score));
+	var largest = getLargest(brain.grid);
+	//console.log(largest);
+	//var scoreLog = Math.floor(Math.log(brain.score));
+	var val = 0;
+	//val += scoreLog > 0 ? scoreLog : 0;
+	//val += Math.floor(largest.first / PLY);
+    val += isLargestInCorner(largest.first, largest.second, brain.grid);
+	val += (brain.grid.availableCells().length) * 2;
+	//console.log(val);
+	return val;
 };
 
-LookAheadAgent.prototype.selectMove = function (gameManager) {
+var findMax = function (arr)
+{
+	var max = Number.MIN_VALUE;
+	for (var i = 1; i < arr.length; i++)
+	{
+		max = Math.max(arr[i-1], arr[i]);
+	}
+	
+	return max;
+};
+
+var expectimax = function (brain, depth) 
+{ 	
+	//console.log("EXPECTIMAX", brain);
+	//TODO: cellsAvailable ends when all cells have a square. Could still be mergeable squares.
+	if (depth === 0 || !brain.grid.availableCells())
+	{
+		return heuristic(brain);
+	}
+	if (depth % 2 == 1) //Is MAX turn
+	{
+		//console.log("MAX", depth);
+		var heuristicArray = [];
+		for (var direction = 0; direction < 4; direction++)
+		{
+			var movedCopy = new AgentBrain(brain);
+			if (movedCopy.move(direction)) //If it can move there, go down in tree.
+			{
+				//console.log("CAN MOVE", direction);
+				heuristicArray.push(heuristic(brain) + expectimax(movedCopy, depth-1));
+			}
+			else
+			{
+				//Fill the place in the array to show we can't move that direction.
+				//console.log("WILL NOT", direction);
+				heuristicArray.push(Number.MIN_VALUE);
+			}
+			//console.log("ARRAY IN LOOP", heuristicArray);
+		}
+		
+		var max = Math.max(...heuristicArray);
+		
+		if (depth == INITIAL_DEPTH)
+		{
+			//console.log(heuristicArray)
+			return heuristicArray.indexOf(max);
+		}
+		else
+			return max
+	}
+	else //CHANCE turn
+	{
+		//console.log("CHANCE", depth);
+		//choose random space for there to be a block. 90% = 2, 10% = 4
+		heuristicArray = [];
+		//chosenTiles = brain.chooseExpectedTiles()
+		chosenTiles = []
+		for (var i = 0; i < NUMBER_OF_CHANCE_SQUARES; i++)
+		{
+			chosenTiles.push("");
+		}
+		for (var i = 0; i < chosenTiles.length; i++)
+		{
+			var brainWRandom = new AgentBrain(brain);
+		
+			//brainWRandom.grid.insertTile(chosenTiles[i])
+			brainWRandom.addRandomTile();
+			//console.log("AFTER ADD");
+			heuristicArray[i] = heuristic(brain) + expectimax(brainWRandom, depth-1);
+		}
+		
+		/*heuristicArray.splice(Math.min(...heuristicArray), 1);
+		var secondWorst = Math.min(...heuristicArray)
+		heuristicArray.splice(Math.min(...heuristicArray), 1);
+		var secondBest = Math.min(...heuristicArray)
+		return Math.random() < 0.5 ? secondWorst : secondBest; */
+		return Math.min(...heuristicArray);
+	}
+};
+
+Agent.prototype.selectMove = function (gameManager) {
     var brain = new AgentBrain(gameManager);
-    this.lastScore = gameManager.score;
-    brain.score = this.lastScore;
-    var action = -1;
-    var max = Number.NEGATIVE_INFINITY;
 
-    for (var i = 0; i < 4; i++) {
-        if (brain.move(i)) {
-            var score = Number.NEGATIVE_INFINITY;
-            for (var j = 0; j < 4; j++) {
-                if (j > 0) brain.move(i);
-                if (brain.move(j)) {
-                    var val = this.evaluateGrid(brain);
-                    if (val > score) {
-                        score = val;
-                    }
-                }
-                brain.reset();
-            }
-            if (score === Number.NEGATIVE_INFINITY) score = this.evaluateGrid(brain);
-            if (score > max) {
-                max = score;
-                action = i;
-            }
-     //       console.log("score: " + score + " max: " + max);
-        } else {
-  //          console.log("move failed " + i);
-            //action++;
-        }
-        brain.reset();
-    }
-    if(action === -1) console.log(action);
-    return action;
+	//console.log("ENTERED")
+    // Use the brain to simulate moves
+    // brain.move(i) 
+    // i = 0: up, 1: right, 2: down, 3: left
+    // brain.reset() resets the brain to the current game board
+
+	//Expectimax
+	moving = expectimax(brain, INITIAL_DEPTH);
+	//console.log("MOVING", moving)
+	if (brain.move(moving))
+	{
+		//console.log("MOVED", moving)
+		return moving;
+	}
+    //if (brain.move(0)) return 0;
+    //if (brain.move(1)) return 1;
+    //if (brain.move(3)) return 3;
+    //if (brain.move(2)) return 2;
 };
 
-LookAheadAgent.prototype.evaluateGrid = function (gameManager) {
-    var that = this;
+Agent.prototype.evaluateGrid = function (gameManager) {
+    // calculate a score for the current grid configuration
 
-    var count = 0;
-
-    for (var i = 0; i < this.functionList.length; i++) {
-        count += this.genes[i]*this.functionList[i](gameManager);
-    }
-
-    return count;
-};
-
-LookAheadAgent.prototype.cloneAndMutate = function () {
-    var agent = new LookAheadAgent();
-
-    for(var i = 0; i < this.functionList.length; i++) {
-        var value = 0;
-        if(this.mutationRate > Math.random())
-            value = Math.random() > 0.5 ? 1 : -1; 
-        agent.genes[i] = this.genes[i] + value;
-    }
-        
-    return agent;
-};
-
-// This code runs the simulation and sends the selected moves to the game
-function AgentManager(gameManager) {
-    this.gameManager = gameManager;
-
-    this.numAgents = 32;
-    this.numRuns = 8;
-    this.runs = 0;
-    this.averageScore = 0;
-
-    this.population = [];
-
-    for (var i = 0; i < this.numAgents; i++) {
-        this.population.push(new LookAheadAgent().cloneAndMutate());
-    }
-
-    this.agent = 0;
-    this.gen = 0;
-};
-
-AgentManager.prototype.selectMove = function () {
-    // 0: up, 1: right, 2: down, 3: left
-    //if (this.gameManager.over) setTimeout(this.gameManager.restart.bind(this.gameManager), 1000);
-    //else
-    //    if (!this.gameManager.move(this.agent.selectMove(this.gameManager))) console.log("bad move");
-
-    // game over
-    if (this.gameManager.over) {
-        console.log("Agent " + this.agent + " Run " + this.runs + " Score " + this.gameManager.score);
-        var score = this.gameManager.score;
-        this.averageScore += score / this.numRuns;
-        this.runs++;
-        if (this.runs === this.numRuns) {
-            this.population[this.agent].score = this.averageScore;
-            this.averageScore = 0;
-            this.runs = 0;
-            console.log("Agent " + this.agent + " Averarge Score " + this.population[this.agent].score);
-            console.log(this.population[this.agent].genes);
-            this.agent++;
-            if (this.agent === this.numAgents) {
-                this.population.sort(function (a, b) {
-                    return a.score - b.score;
-                });
-
-                for (var i = 0; i < this.numAgents; i++) {
-                    console.log(this.population[i].score);
-                }
-
-                console.log("GENERATION " + this.gen++);
-                console.log("Max Score " + this.population[this.population.length - 1].score);
-
-                this.population.splice(0, this.numAgents / 2);
-                var len = this.population.length;
-                for (var i = 0; i < this.numAgents - this.numAgents / 2; i++) {
-                    var index = randomInt(len);
-                    this.population.push(this.population[index].cloneAndMutate());
-                }
-
-                this.agent = 0;
-            }
-        }
-        
-        setTimeout(this.gameManager.restart.bind(this.gameManager), 1000);
-    } else { // game ongoing
-        var agent = this.population[this.agent];
-        if (this.gameManager.won && !this.gameManager.keepPlaying) setTimeout(this.gameManager.keepPlaying.bind(this.gameManager), 1);
-        else if (!this.gameManager.move(agent.selectMove(this.gameManager))) console.log("bad move");
-    }
 };
